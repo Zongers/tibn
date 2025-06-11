@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="https://i.ibb.co/RpCzFrqK/icon.png" type="image/png">
+    <title>Secure Temp Input</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #75ba1a;
+            --secondary: #fb0088;
+            --light: #FFFFFF;
+            --dark: #292929;
+            --bg: #F7F7F7;
+            --border: #e0e0e0;
+            --gray: #808080; /* New gray color */
+        }
+
+        body {
+            background-color: var(--bg);
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+        }
+
+        .container {
+            background: var(--light);
+            border-radius: 8px;
+            padding: 30px; /* Increased padding */
+            width: 100%;
+            max-width: 550px; /* Slightly wider */
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-top: 20px;
+        }
+
+        h1 {
+            color: var(--primary);
+            font-size: 1.5rem;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .input-box {
+            width: 100%;
+            height: 150px;
+            padding: 15px;
+            border: 2px solid var(--border);
+            border-radius: 6px;
+            font-family: monospace;
+            resize: vertical;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+
+        .input-box:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            flex: 1;
+            min-width: 120px;
+        }
+
+        .btn-space {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-enter {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-paste {
+            background: var(--secondary);
+            color: white;
+        }
+
+        .btn-copy {
+            background: var(--gray); /* Gray color */
+            color: white;
+        }
+
+        .notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: var(--primary);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 6px;
+            display: none;
+            z-index: 1000;
+        }
+
+        @media (max-width: 600px) {
+            .buttons {
+                flex-direction: column;
+            }
+            .btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Rest of the HTML remains identical to previous version -->
+    <div class="container">
+        <h1><i class="fas fa-keyboard"></i> Secure Input Box</h1>
+        
+        <textarea class="input-box" id="inputData" placeholder="Type or paste sensitive text here..."></textarea>
+        
+        <div class="buttons">
+            <button class="btn btn-space" onclick="insertText(' ')">
+                <i class="fas fa-space"></i> Space
+            </button>
+            <button class="btn btn-enter" onclick="insertText('\n')">
+                <i class="fas fa-arrow-down"></i> Enter
+            </button>
+            <button class="btn btn-paste" onclick="pasteText()">
+                <i class="fas fa-paste"></i> Paste
+            </button>
+            <button class="btn btn-copy" onclick="copyAllText()">
+                <i class="fas fa-copy"></i> Copy All
+            </button>
+        </div>
+    </div>
+
+    <div class="notification" id="notification">
+        <i class="fas fa-check"></i> <span id="notificationText">Text copied!</span>
+    </div>
+
+    <script>
+        // (JavaScript remains identical to previous version)
+        document.addEventListener('DOMContentLoaded', function() {
+            const savedText = sessionStorage.getItem('tempText');
+            if (savedText) {
+                document.getElementById('inputData').value = savedText;
+            }
+            document.getElementById('inputData').focus();
+        });
+
+        function saveText() {
+            const text = document.getElementById('inputData').value;
+            sessionStorage.setItem('tempText', text);
+        }
+
+        const debounceSave = debounce(saveText, 500);
+        document.getElementById('inputData').addEventListener('input', debounceSave);
+
+        function insertText(text) {
+            const input = document.getElementById('inputData');
+            const start = input.selectionStart;
+            const end = input.selectionEnd;
+            
+            input.value = input.value.substring(0, start) + text + input.value.substring(end);
+            input.selectionStart = input.selectionEnd = start + text.length;
+            input.focus();
+            saveText();
+        }
+
+        function pasteText() {
+            const input = document.getElementById('inputData');
+            input.focus();
+            
+            if (navigator.clipboard?.readText) {
+                navigator.clipboard.readText()
+                    .then(text => {
+                        const start = input.selectionStart;
+                        const end = input.selectionEnd;
+                        input.value = input.value.substring(0, start) + text + input.value.substring(end);
+                        input.selectionStart = input.selectionEnd = start + text.length;
+                        showNotification('Text pasted!');
+                        saveText();
+                    })
+                    .catch(err => {
+                        console.error('Clipboard error:', err);
+                        fallbackPaste();
+                    });
+            } else {
+                fallbackPaste();
+            }
+        }
+
+        function fallbackPaste() {
+            const input = document.getElementById('inputData');
+            input.focus();
+            document.execCommand('paste');
+            showNotification('Text pasted!');
+            saveText();
+        }
+
+        function copyAllText() {
+            const input = document.getElementById('inputData');
+            input.select();
+            document.execCommand('copy');
+            showNotification('Copied to clipboard!');
+        }
+
+        function showNotification(message) {
+            const notification = document.getElementById('notification');
+            const notificationText = document.getElementById('notificationText');
+            notificationText.textContent = message;
+            notification.style.display = 'block';
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 2000);
+        }
+
+        function debounce(func, delay) {
+            let timeout;
+            return function() {
+                const context = this;
+                const args = arguments;
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(context, args), delay);
+            };
+        }
+
+        window.addEventListener('beforeunload', function() {
+            sessionStorage.removeItem('tempText');
+            localStorage.removeItem('tempText');
+        });
+    </script>
+</body>
+</html>
